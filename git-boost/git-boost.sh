@@ -14,6 +14,8 @@ TEMPLATES_DIR="$HOME/.local/share/git-boost/templates"  # Corrected path to temp
 DEFAULT_GIT_USER=""
 DEFAULT_GIT_EMAIL=""
 
+set -e
+
 # To hold log of actions performed
 SUMMARY_LOG=()
 
@@ -113,6 +115,14 @@ function link_repo() {
 
   cd "$choice" || { echo "[ERROR] Failed to navigate to $choice."; return 1; }
 
+  [ -d ".git" ] || {
+    gum confirm "Git not initialized in $choice. Initialize now?" && git init || { echo "[ERROR] Failed to initialize git."; return 1; }
+  }
+
+  ensure_git_config || return 1
+  handle_branch_switch || return 1
+  add_standard_files || return 1
+  
   # Check if the remote origin is already set
   local remote_url=$(git remote get-url origin 2>/dev/null)
 
@@ -125,55 +135,69 @@ function link_repo() {
     echo "[GIT-BOOST] Remote 'origin' already set to $remote_url. Skipping URL input."
   fi
 
-  [ -d ".git" ] || {
-    gum confirm "Git not initialized in $choice. Initialize now?" && git init || { echo "[ERROR] Failed to initialize git."; return 1; }
-  }
-
-  ensure_git_config || return 1
-  add_standard_files || return 1
-
   git push origin master || { echo "[ERROR] Failed to push to $choice."; return 1; }
   SUMMARY_LOG+=("Successfully linked and pushed $choice")
 }
 
-# Standardize one or all repos in a directory
+# Standardize all or specific repos
 function standardize_repos() {
-  local root="$1"
-  local repos=($(find "$root" -maxdepth 1 -type d -not -name ".git" -not -name ".DS_Store"))
-  local choice=$(gum choose --header="Choose repo to standardize" All ${repos[@]})
+  local git_repos=()
+
+  echo "[GIT-BOOST] Scanning for Git repositories in: $root"
+
+  for dir in ./*/; do
+    if [[ -d "$dir" && -e "$dir/.git" ]]; then
+      git_repos+=("$(basename "$dir")")
+    fi
+  done
+
+  if (( ${#git_repos[@]} == 0 )); then
+    echo "[GIT-BOOST] No Git repositories found in current directory."
+    return 1
+  fi
+
+  local choice=$(gum choose --no-limit --header="Select repositories to standardize" "All" "${git_repos[@]}")
+
+  local selected_repos=()
 
   if [[ "$choice" == "All" ]]; then
-    for repo in ${repos[@]}; do
-      if ! is_user_generated "$(basename "$repo")"; then
-        continue
-      fi
-      cd "$repo" || continue
-
-      echo "\n[GIT-BOOST] Standardizing $(basename "$repo")"
-      
-      handle_branch_switch || { echo "[ERROR] Failed to handle branch switch in $repo."; continue; }
-
-      ensure_git_config || { echo "[ERROR] Git config failed in $repo."; continue; }
-      add_standard_files || { echo "[ERROR] Failed to add standard files to $repo."; continue; }
-
-      git remote get-url origin &>/dev/null && git push origin master || echo "[ERROR] Failed to push $repo (no remote 'origin')"
-      
-      SUMMARY_LOG+=("Successfully standardized $repo")
-      cd - >/dev/null
-    done
+    selected_repos=("${git_repos[@]}")
   else
-    cd "$choice" || { echo "[ERROR] Failed to navigate to $choice."; return 1; }
-
-    handle_branch_switch || { echo "[ERROR] Failed to handle branch switch."; return 1; }
-
-    ensure_git_config || { echo "[ERROR] Git config failed."; return 1; }
-    add_standard_files || { echo "[ERROR] Failed to add standard files."; return 1; }
-
-    git remote get-url origin &>/dev/null && git push origin master || echo "[ERROR] Failed to push to $choice (no remote 'origin')"
-
-    SUMMARY_LOG+=("Successfully standardized $choice")
+    selected_repos=("$choice")
   fi
+
+  for repo in "${selected_repos[@]}"; do
+    echo "\n[GIT-BOOST] Standardizing $repo"
+
+    cd "./$repo" || { echo "[ERROR] Failed to access $repo"; SUMMARY_LOG+=("Skipped $repo: access failed"); continue; }
+
+    ensure_git_config || { echo "[ERROR] Git config missing in $repo"; SUMMARY_LOG+=("Skipped $repo: git config failed"); cd "$root"; continue; }
+
+    handle_branch_switch || { echo "[ERROR] Branch switch failed in $repo"; SUMMARY_LOG+=("Skipped $repo: branch switch failed"); cd "$root"; continue; }
+
+    add_standard_files || { echo "[ERROR] Failed to add standard files in $repo"; SUMMARY_LOG+=("Skipped $repo: failed to add standard files"); cd "$root"; continue; }
+
+    if git remote get-url origin &>/dev/null; then
+      git push origin master || echo "[ERROR] Push failed for $repo"
+    else
+      echo "[GIT-BOOST] No remote origin set for $repo. Skipping push."
+    fi
+
+    SUMMARY_LOG+=("Standardized $repo")
+    cd - >/dev/null || { echo "[ERROR] Failed to return to previous directory"; break; }
+  done
+
+  # Log ignored folders
+  for dir in "$root"/*; do
+    if [[ -d "$dir" ]] && ! [[ -d "$dir/.git" ]]; then
+      local base=$(basename "$dir")
+      if is_user_generated "$base"; then
+        SUMMARY_LOG+=("Skipped $base: not a Git repository")
+      fi
+    fi
+  done
 }
+
 
 # Manual help
 function show_manual() {
@@ -209,8 +233,7 @@ function interactive_menu() {
       link_repo || return 1
       ;;
     "Standardize repos")
-      local path=$(gum input --placeholder "Enter base directory path")
-      standardize_repos "$path" || return 1
+      standardize_repos || return 1
       ;;
   esac
 }
@@ -233,7 +256,7 @@ case "$1" in
     link_repo "$2" "$3" || exit 1
     ;;
   --standardize)
-    standardize_repos "$2" || exit 1
+    standardize_repos || exit 1
     ;;
   --version)
     show_version
