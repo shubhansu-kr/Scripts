@@ -1,46 +1,60 @@
-# Project Title
+# Handy Scripts Collection
 
-A brief description of your project, what it does, and why it exists.
+Welcome to my personal toolbox — a curated collection of scripts I use to automate and simplify everyday tasks on my machine. Each script lives in its own directory with all the essentials to install, understand, and use it seamlessly.
 
-## 🚀 Features
+---
 
-- Clear and concise feature list
-- Easy-to-understand structure
-- Customizable and extendable
+## Repository Structure
 
-## 📆 Installation
+Each script is organized into its own folder with the following structure:
+
+```yaml
+scripts/
+├── script-name/
+│ ├── script.sh # The main executable script
+│ ├── install.sh # Easy installer for the script
+│ ├── Makefile # Optional: standard build/install commands
+│ ├── README.md # Script-specific documentation
+│ └── templates/ # (If needed) supporting files or configs
+```
+
+---
+
+## Getting Started
+
+You can navigate into any script folder and either run the `install.sh` or use the provided `Makefile` to set it up.
+
+### Installation (general)
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/your-repo.git
-cd your-repo
-
-# Install dependencies (if applicable)
-# e.g., npm install, pip install -r requirements.txt
+cd scripts/script-name
+./install.sh
+# or
+make install
 ```
 
-## 🧲 Usage
+Each script folder includes a README.md with usage instructions and any dependencies.
 
-```bash
-# Example usage command
-./run.sh
-```
+## What's Inside?
 
-## 📂 Project Structure
+Scripts range from Git automation to system tweaks. Some examples include:
 
-```structure
-your-repo/
-├── README.md
-├── LICENSE
-├── CONTRIBUTING.md
-├── src/
-└── ...
-```
+- `git-boost/` – Initialize and standardize GitHub repos faster
 
-## 🤝 Contributing
+- `zsh-setup/` – Set up a custom Zsh shell with aliases, themes, etc.
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+- `cleanup-tool/` – Remove temporary files, cache, logs, and more
 
-## 📄 License
+- `screenshot-sorter/` – Organize screenshots into folders by date
 
-This project is licensed under the terms of the [MIT License](./LICENSE).
+(Actual script names and descriptions may vary. Explore each folder to learn more.)
+
+## Development & Contribution
+
+This repo is meant for personal use, but feel free to fork it, tweak it, or use it as a template for your own scripting needs.
+
+If you'd like to suggest improvements or ideas, PRs are welcome!
+
+## License
+
+This repository is licensed under the MIT License.
